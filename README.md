@@ -4,13 +4,13 @@
 
 ## Install
 
-```
+```bash
 go get -u github.com/DearMadMan/amqpretry
 ```
 
 ## Usage
 
-```
+```go
 op := amqpretry.Option{
     DNS: "amqp://dev:dev@localhost:15666"
     DeliverQueue: "deliver_queue",
@@ -27,5 +27,5 @@ op := amqpretry.Option{
 }
 ```
 
-## Refer
+## Reference
 [lanetix/node-amqplib-retry](https://github.com/lanetix/node-amqplib-retry)
