@@ -1,0 +1,31 @@
+## Diagram
+
+![diagram](diagram.png)
+
+## Install
+
+```
+go get -u github.com/DearMadMan/amqpretry
+```
+
+## Usage
+
+```
+op := amqpretry.Option{
+    DNS: "amqp://dev:dev@localhost:15666"
+    DeliverQueue: "deliver_queue",
+    FailureQueue: "deliver_failure_queue",
+    DeadLetterQueue: "deliver_dead_letter_queue",
+    DeadLetterExchange: "dead_letter_exchange",
+    InitQueueAndExchange: true,
+    Runnable:  func(d *amqp.Delivery, retry *AMQPRetry) error {
+        // no need to 'ack' or 'nack' messages
+        // message will retry when error returned and policy allowed
+
+        return nil
+    }, 
+}
+```
+
+## Refer
+[lanetix/node-amqplib-retry](https://github.com/lanetix/node-amqplib-retry)
