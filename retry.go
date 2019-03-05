@@ -33,6 +33,8 @@ type Option struct {
 	RetryPolicy          func(times int16) (bool, string)
 	RetryHandle          func(d *amqp.Delivery, retry *AMQPRetry, next int16, expiration string) error
 	FailureHandle        func(d *amqp.Delivery, retry *AMQPRetry) error
+	OnAckError           func(d *amqp.Delivery, retry *AMQPRetry, err error)
+	AfterAck             func(d *amqp.Delivery, retry *AMQPRetry)
 }
 
 func New(op Option) (*AMQPRetry, error) {
@@ -100,7 +102,11 @@ func (r *AMQPRetry) Start() {
 		}
 
 		err = d.Ack(false)
-		failOnError(err)
+		if err != nil {
+			r.onAckError(&d, r, err)
+		} else {
+			r.afterAck(&d, r)
+		}
 	}
 }
 
@@ -153,6 +159,13 @@ func (r *AMQPRetry) retry(d *amqp.Delivery, retry *AMQPRetry, next int16, expira
 	)
 }
 
+func (r *AMQPRetry) onAckError(d *amqp.Delivery, retry *AMQPRetry, err error) {
+	failOnError(err)
+}
+
+func (r *AMQPRetry) afterAck(d *amqp.Delivery, retry *AMQPRetry) {
+}
+
 func (r *AMQPRetry) failure(d *amqp.Delivery, retry *AMQPRetry) error {
 	return r.Pusher().Publish(
 		"", // exchange
@@ -191,6 +204,14 @@ func (r *AMQPRetry) init() error {
 
 	if r.option.FailureHandle == nil {
 		r.option.FailureHandle = r.failure
+	}
+
+	if r.option.OnAckError == nil {
+		r.option.OnAckError = r.onAckError
+	}
+
+	if r.option.AfterAck == nil {
+		r.option.AfterAck = r.afterAck
 	}
 
 	if r.option.InitQueueAndExchange {

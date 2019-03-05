@@ -1,4 +1,4 @@
-## Diagram
+## Overview
 
 ![diagram](diagram.png)
 
@@ -29,3 +29,8 @@ op := amqpretry.Option{
 
 ## Reference
 [lanetix/node-amqplib-retry](https://github.com/lanetix/node-amqplib-retry)
+
+## Feature
+
+* [ ] OnAckError
+* [ ] AfterAck
