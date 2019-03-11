@@ -28,6 +28,7 @@ type Option struct {
 	DeadLetterQueue      string
 	DeadLetterExchange   string
 	RetryHeader          string
+	Qos                  ConsumerQosOptinon
 	InitQueueAndExchange bool
 	Runnable             func(d *amqp.Delivery, retry *AMQPRetry) error
 	RetryPolicy          func(times int16) (bool, string)
@@ -35,6 +36,12 @@ type Option struct {
 	FailureHandle        func(d *amqp.Delivery, retry *AMQPRetry) error
 	OnAckError           func(d *amqp.Delivery, retry *AMQPRetry, err error)
 	AfterAck             func(d *amqp.Delivery, retry *AMQPRetry)
+}
+
+type ConsumerQosOptinon struct {
+	PrefetchCount int
+	PrefetchSize  int
+	Global        bool
 }
 
 func New(op Option) (*AMQPRetry, error) {
@@ -77,14 +84,17 @@ func validate(op Option) error {
 }
 
 func (r *AMQPRetry) Start() {
+	err := r.Consumer().Qos(r.option.Qos.PrefetchCount, r.option.Qos.PrefetchSize, r.option.Qos.Global)
+	failOnError(err)
+
 	messages, err := r.Consumer().Consume(
 		r.option.DeliverQueue, // queue
-		"",    // consumer
-		false, // auto-ack
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
+		"",                    // consumer
+		false,                 // auto-ack
+		false,                 // exclusive
+		false,                 // no-local
+		false,                 // no-wait
+		nil,                   // args
 	)
 
 	failOnError(err)
@@ -145,10 +155,10 @@ func (r *AMQPRetry) retry(d *amqp.Delivery, retry *AMQPRetry, next int16, expira
 	d.Headers[r.option.RetryHeader] = next
 
 	return r.Pusher().Publish(
-		"", // exchange
+		"",                       // exchange
 		r.option.DeadLetterQueue, // routing key
-		false, // mandatory
-		false, // immediate
+		false,                    // mandatory
+		false,                    // immediate
 		amqp.Publishing{
 			DeliveryMode: amqp.Persistent,
 			Headers:      d.Headers,
@@ -168,10 +178,10 @@ func (r *AMQPRetry) afterAck(d *amqp.Delivery, retry *AMQPRetry) {
 
 func (r *AMQPRetry) failure(d *amqp.Delivery, retry *AMQPRetry) error {
 	return r.Pusher().Publish(
-		"", // exchange
+		"",                    // exchange
 		r.option.FailureQueue, // routing key
-		false, // mandatory
-		false, // immediate
+		false,                 // mandatory
+		false,                 // immediate
 		amqp.Publishing{
 			DeliveryMode: amqp.Persistent,
 			ContentType:  "application/json",

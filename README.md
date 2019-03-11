@@ -32,5 +32,8 @@ op := amqpretry.Option{
 
 ## Feature
 
-* [ ] OnAckError
-* [ ] AfterAck
+* [x] OnAckError
+* [x] AfterAck
+* [ ] ErrorHeader
+* [ ] Rabbitmq lazy mode header support
+* [x] Message Qos
