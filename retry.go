@@ -33,13 +33,21 @@ type Option struct {
 	RetryHeader          string
 	EnableErrorHeader    bool
 	ErrorHeader          string
+	Qos                  ConsumerQosOption
 	InitQueueAndExchange bool
+	DeclareLazyQueue     bool
 	Runnable             func(d *amqp.Delivery, retry *AMQPRetry) error
 	RetryPolicy          func(times int16) (bool, string)
 	RetryHandle          func(d *amqp.Delivery, retry *AMQPRetry, next int16, expiration string) error
 	FailureHandle        func(d *amqp.Delivery, retry *AMQPRetry) error
 	OnAckError           func(d *amqp.Delivery, retry *AMQPRetry, err error)
 	AfterAck             func(d *amqp.Delivery, retry *AMQPRetry)
+}
+
+type ConsumerQosOption struct {
+	PrefetchCount int
+	PrefetchSize  int
+	Global        bool
 }
 
 func New(op Option) (*AMQPRetry, error) {
@@ -82,6 +90,9 @@ func validate(op Option) error {
 }
 
 func (r *AMQPRetry) Start() {
+	err := r.Consumer().Qos(r.option.Qos.PrefetchCount, r.option.Qos.PrefetchSize, r.option.Qos.Global)
+	failOnError(err)
+
 	messages, err := r.Consumer().Consume(
 		r.option.DeliverQueue, // queue
 		"",    // consumer
@@ -259,6 +270,9 @@ func (r *AMQPRetry) initQueueAndExchange() error {
 		var priority int16 = 10
 		args := make(amqp.Table)
 		args["x-max-priority"] = priority
+		if r.option.DeclareLazyQueue {
+			args["x-queue-mode"] = "lazy"
+		}
 
 		_, err := ch.QueueDeclare(
 			q,     // name
