@@ -10,7 +10,10 @@ import (
 	"github.com/streadway/amqp"
 )
 
-const RetryHeader = "retry-times"
+const (
+	RetryHeader = "retry-times"
+	ErrorHeader = "error-message"
+)
 
 type AMQPRetry struct {
 	option       Option
@@ -28,6 +31,8 @@ type Option struct {
 	DeadLetterQueue      string
 	DeadLetterExchange   string
 	RetryHeader          string
+	EnableErrorHeader    bool
+	ErrorHeader          string
 	InitQueueAndExchange bool
 	Runnable             func(d *amqp.Delivery, retry *AMQPRetry) error
 	RetryPolicy          func(times int16) (bool, string)
@@ -92,6 +97,9 @@ func (r *AMQPRetry) Start() {
 	for d := range messages {
 		err := r.option.Runnable(&d, r)
 		if err != nil {
+			if r.option.EnableErrorHeader {
+				r.setErrorHeader(&d, err)
+			}
 			next := r.currentRetryTimes(&d) + 1
 			if ok, expiration := r.option.RetryPolicy(next); ok {
 				err = r.option.RetryHandle(&d, r, next, expiration)
@@ -108,6 +116,14 @@ func (r *AMQPRetry) Start() {
 			r.afterAck(&d, r)
 		}
 	}
+}
+
+func (r *AMQPRetry) setErrorHeader(d *amqp.Delivery, err error) {
+	if d.Headers == nil {
+		d.Headers = make(amqp.Table)
+	}
+
+	d.Headers[r.option.ErrorHeader] = err.Error()
 }
 
 func (r *AMQPRetry) Pusher() *amqp.Channel {
@@ -192,6 +208,10 @@ func (r *AMQPRetry) init() error {
 
 	if r.option.RetryHeader == "" {
 		r.option.RetryHeader = RetryHeader
+	}
+
+	if r.option.ErrorHeader == "" {
+		r.option.ErrorHeader = ErrorHeader
 	}
 
 	if r.option.RetryPolicy == nil {
