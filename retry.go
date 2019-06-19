@@ -95,37 +95,39 @@ func (r *AMQPRetry) Start() {
 
 	messages, err := r.Consumer().Consume(
 		r.option.DeliverQueue, // queue
-		"",    // consumer
-		false, // auto-ack
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
+		"",                    // consumer
+		false,                 // auto-ack
+		false,                 // exclusive
+		false,                 // no-local
+		false,                 // no-wait
+		nil,                   // args
 	)
 
 	failOnError(err)
 
 	for d := range messages {
-		err := r.option.Runnable(&d, r)
-		if err != nil {
-			if r.option.EnableErrorHeader {
-				r.setErrorHeader(&d, err)
+		go func(d amqp.Delivery) {
+			err := r.option.Runnable(&d, r)
+			if err != nil {
+				if r.option.EnableErrorHeader {
+					r.setErrorHeader(&d, err)
+				}
+				next := r.currentRetryTimes(&d) + 1
+				if ok, expiration := r.option.RetryPolicy(next); ok {
+					err = r.option.RetryHandle(&d, r, next, expiration)
+				} else {
+					err = r.option.FailureHandle(&d, r)
+				}
+				failOnError(err)
 			}
-			next := r.currentRetryTimes(&d) + 1
-			if ok, expiration := r.option.RetryPolicy(next); ok {
-				err = r.option.RetryHandle(&d, r, next, expiration)
-			} else {
-				err = r.option.FailureHandle(&d, r)
-			}
-			failOnError(err)
-		}
 
-		err = d.Ack(false)
-		if err != nil {
-			r.onAckError(&d, r, err)
-		} else {
-			r.afterAck(&d, r)
-		}
+			err = d.Ack(false)
+			if err != nil {
+				r.onAckError(&d, r, err)
+			} else {
+				r.afterAck(&d, r)
+			}
+		}(d)
 	}
 }
 
@@ -172,10 +174,10 @@ func (r *AMQPRetry) retry(d *amqp.Delivery, retry *AMQPRetry, next int16, expira
 	d.Headers[r.option.RetryHeader] = next
 
 	return r.Pusher().Publish(
-		"", // exchange
+		"",                       // exchange
 		r.option.DeadLetterQueue, // routing key
-		false, // mandatory
-		false, // immediate
+		false,                    // mandatory
+		false,                    // immediate
 		amqp.Publishing{
 			DeliveryMode: amqp.Persistent,
 			Headers:      d.Headers,
@@ -195,10 +197,10 @@ func (r *AMQPRetry) afterAck(d *amqp.Delivery, retry *AMQPRetry) {
 
 func (r *AMQPRetry) failure(d *amqp.Delivery, retry *AMQPRetry) error {
 	return r.Pusher().Publish(
-		"", // exchange
+		"",                    // exchange
 		r.option.FailureQueue, // routing key
-		false, // mandatory
-		false, // immediate
+		false,                 // mandatory
+		false,                 // immediate
 		amqp.Publishing{
 			DeliveryMode: amqp.Persistent,
 			ContentType:  "application/json",
