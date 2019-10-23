@@ -12,19 +12,26 @@ go get -u github.com/DearMadMan/amqpretry
 
 ```go
 op := amqpretry.Option{
-    DNS: "amqp://dev:dev@localhost:15666"
+    DNS: "amqp://dev:dev@localhost:15666",
     DeliverQueue: "deliver_queue",
     FailureQueue: "deliver_failure_queue",
     DeadLetterQueue: "deliver_dead_letter_queue",
     DeadLetterExchange: "dead_letter_exchange",
     InitQueueAndExchange: true,
-    Runnable:  func(d *amqp.Delivery, retry *AMQPRetry) error {
+    Runnable:  func(d *amqp.Delivery, retry *amqpretry.AMQPRetry) error {
         // no need to 'ack' or 'nack' messages
         // message will retry when error returned and policy allowed
 
         return nil
     }, 
 }
+
+retry, err := amqpretry.New(op)
+if err != nil {
+    log.Fatal(err)
+}
+
+retry.Start()
 ```
 
 ## Reference
