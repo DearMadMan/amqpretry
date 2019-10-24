@@ -123,9 +123,9 @@ func (r *AMQPRetry) Start() {
 
 			err = d.Ack(false)
 			if err != nil {
-				r.onAckError(&d, r, err)
+				r.option.OnAckError(&d, r, err)
 			} else {
-				r.afterAck(&d, r)
+				r.option.AfterAck(&d, r)
 			}
 		}(d)
 	}
